@@ -1,4 +1,4 @@
-% Copyright (C) 2005-6 Roger S. Bivand
+% Copyright (C) 2005-7 Roger S. Bivand
 %
 \name{readRAST6}
 \alias{readRAST6}
@@ -47,26 +47,37 @@ writeRAST6(x, vname, zcol = 1, NODATA=-9999, ignore.stderr = FALSE)
 \code{readRAST6} returns a SpatialGridDataFrame objects with an AttributeList in the data slots, and with the projection argument set.
 }
 
+\note{In readRAST6, when any cat= argument values are TRUE, it may appear that a system call to r.stats has failed. This is caused by the existence of older and newer GRASS 6 versions, using -q or --q as quiet flags. If -q fails, --q is tried, so the error message will be seen on newer GRASS 6 installations. If it is found an inconvenience, the ignore.stderr argument should be set to TRUE.}
 
 \author{Roger S. Bivand, e-mail: \email{Roger.Bivand@nhh.no}}
 
 \examples{
 if (nchar(Sys.getenv("GISRC")) > 0) {
-  spear <- readRAST6(c("geology", "elevation.dem"), cat=c(TRUE, FALSE), ignore.stderr=TRUE)
+  spear <- readRAST6(c("geology", "elevation.dem"), cat=c(TRUE, FALSE),
+    ignore.stderr=TRUE)
   table(spear$geology)
-  system("r.stats -q -cl geology")
+  if (Sys.getenv("OSTYPE") == "msys") system("r.stats.exe -q -cl geology")
+  else system("r.stats -q -cl geology")
   boxplot(spear$elevation.dem ~ spear$geology)
   spear$sqdem <- sqrt(spear$elevation.dem)
   writeRAST6(spear, "sqdemSP", zcol="sqdem", NODATA=-9999.99, ignore.stderr=TRUE)
-  system("r.info sqdemSP", ignore.stderr=TRUE)
-  system("g.remove rast=sqdemSP")
-  system("r.mapcalc \'quads0 = quads - 1\'", ignore.stderr=TRUE)
-  system("r.stats -c quads0", ignore.stderr=TRUE)
+  if (Sys.getenv("OSTYPE") == "msys")
+    system("r.info.exe sqdemSP", ignore.stderr=TRUE)
+  else system("r.info sqdemSP", ignore.stderr=TRUE)
+  if (Sys.getenv("OSTYPE") == "msys") system("g.remove.exe rast=sqdemSP")
+  else system("g.remove rast=sqdemSP")
+  if (Sys.getenv("OSTYPE") == "msys")
+    system("r.mapcalc.exe quads0 = quads - 1", ignore.stderr=TRUE)
+  else system("r.mapcalc \'quads0 = quads - 1\'", ignore.stderr=TRUE)
+  if (Sys.getenv("OSTYPE") == "msys")
+    system("r.stats.exe -c quads0", ignore.stderr=TRUE)
+  else system("r.stats -c quads0", ignore.stderr=TRUE)
   quads0 <- readRAST6("quads0", ignore.stderr=TRUE)
   table(quads0$quads0)
   quads0 <- readRAST6("quads0", ignore.stderr=TRUE, NODATA=0)
   table(quads0$quads0)
-  system("g.remove rast=quads0")
+  if (Sys.getenv("OSTYPE") == "msys") system("g.remove.exe rast=quads0")
+  else system("g.remove rast=quads0")
 }
 }
 \keyword{spatial}
