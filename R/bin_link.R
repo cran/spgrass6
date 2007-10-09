@@ -2,7 +2,8 @@
 # Copyright (c) 2005-7 Roger S. Bivand
 #
 
-readRAST6 <- function(vname, cat=NULL, ignore.stderr = FALSE, NODATA=-9999) {
+readRAST6 <- function(vname, cat=NULL, ignore.stderr = FALSE, 
+	NODATA=NULL) {
 	if (!is.null(cat))
 		if(length(vname) != length(cat)) 
 			stop("vname and cat not same length")
@@ -34,9 +35,34 @@ readRAST6 <- function(vname, cat=NULL, ignore.stderr = FALSE, NODATA=-9999) {
 		gtmpfl11 <- paste(gtmpfl1, vname[i], sep=.Platform$file.sep)
 		rtmpfl11 <- paste(rtmpfl1, vname[i], sep=.Platform$file.sep)
 
+# 071009 Markus Neteler's idea to use range
+		if (is.null(NODATA)) {
+		    cmd <- paste(paste("r.info", .addexe(), sep=""),
+                        " -r", vname[i])
+
+		    tull <- ifelse(.Platform$OS.type == "windows", 
+			tx <- system(cmd, intern=TRUE), 
+			tx <- system(cmd, intern=TRUE, 
+			ignore.stderr=ignore.stderr))
+		    tx <- gsub("=", ":", tx)
+		    con <- textConnection(tx)
+		    res <- read.dcf(con)
+		    close(con)
+		    lres <- as.list(res)
+		    names(lres) <- colnames(res)
+		    lres$min <- floor(as.double(lres$min))
+		    vNODATA <- floor(lres$min) - 1
+		} else {
+		    if (!is.finite(NODATA) || !is.numeric(NODATA))
+			stop("invalid NODATA value")
+		    if (NODATA != round(NODATA)) 
+			warning("NODATA rounded to integer")
+		    vNODATA <- round(NODATA)
+		}
+
 		cmd <- paste(paste("r.out.bin", .addexe(), sep=""),
                     " -b input=", vname[i], " output=", gtmpfl11,
-                    " null=", NODATA, sep="")
+                    " null=", vNODATA, sep="")
 
 # 061107 Dylan Beaudette NODATA
 
@@ -61,37 +87,41 @@ readRAST6 <- function(vname, cat=NULL, ignore.stderr = FALSE, NODATA=-9999) {
 			names(lst) <- onames
 			for (i in 1:ncols) lst[[i]] <- resa@data[[i]]
 			lst[[ncols+1]] <- res@data[[1]]
-			if (.sp_lt_0.9()) {
-				df <- AttributeList(lst)
-			} else {
-				df <- data.frame(lst)
-			}
+			df <- data.frame(lst)
 			resa <- SpatialGridDataFrame(grid=grida, 
 				data=df, proj4string=p4)
 		}
 	}
 
 	if (!is.null(cat)) {
+		cmd <- paste("g.version", .addexe())
+		tull <- ifelse(.Platform$OS.type=="windows",
+			Gver <- system(cmd, intern=TRUE), 
+			Gver <- system(cmd, intern=TRUE, 
+			ignore.stderr=ignore.stderr))
+		G63 <- Gver > "GRASS 6.2"
 		for (i in seq(along=cat)) {
 			if (cat[i] && is.integer(resa@data[[i]])) {
 
 # note --q in 6.3.cvs
-				cmd <- paste(paste("r.stats", .addexe(),
+				if (G63) cmd <- paste(paste("r.stats", 
+				    .addexe(), sep=""), "-l --q", vname[i])
+				else cmd <- paste(paste("r.stats", .addexe(),
                                     sep=""), "-l -q", vname[i])
 
 				tull <- ifelse(.Platform$OS.type=="windows",
 				    rSTATS <- system(cmd, intern=TRUE), 
 				    rSTATS <- system(cmd, intern=TRUE, 
 				    ignore.stderr=ignore.stderr))
-				if ((length(rSTATS) == 0)
-                                    || (length(grep("Sorry", rSTATS[1])) > 0)) {
-				    cmd <- paste(paste("r.stats", .addexe(),
-                                        sep=""), "-l --q", vname[i])
-				    tull <- ifelse(.Platform$OS.type=="windows",
-				    rSTATS <- system(cmd, intern=TRUE),
-				    rSTATS <- system(cmd, intern=TRUE,
-				    ignore.stderr=ignore.stderr))
-				}
+#				if ((length(rSTATS) == 0)
+#                                    || (length(grep("Sorry", rSTATS[1])) > 0)) {
+#				    cmd <- paste(paste("r.stats", .addexe(),
+#                                        sep=""), "-l --q", vname[i])
+#				    tull <- ifelse(.Platform$OS.type=="windows",
+#				    rSTATS <- system(cmd, intern=TRUE),
+#				    rSTATS <- system(cmd, intern=TRUE,
+#				    ignore.stderr=ignore.stderr))
+#				}
 
 				cats <- strsplit(rSTATS, " ")
 				catnos <- sapply(cats, function(x) x[1])
@@ -132,6 +162,10 @@ readBinGrid <- function(fname, colname=basename(fname),
 	lres$skipbytes <- as.integer(lres$skipbytes)
 	lres$nodata <- ifelse(integer, as.integer(lres$nodata), 
 		as.numeric(lres$nodata))
+	lres$byteorder <- as.character(lres$byteorder)
+	endian <- .Platform$endian
+	if ((endian == "little" && lres$byteorder == "M") ||
+		(endian == "big" && lres$byteorder == "I")) endian <- "swap"
 	con <- file(paste(fname, "wld", sep="."), "r")
 	l6 <- readLines(con, n=6)
 	close(con)
@@ -144,23 +178,33 @@ readBinGrid <- function(fname, colname=basename(fname),
 	what <- ifelse(integer, "integer", "double")
 	n <- lres$nrows * lres$ncols
 	size <- lres$nbits/8
-	map <- readBin(fname, what=what, n=n, size=size, signed=TRUE)
+	map <- readBin(fname, what=what, n=n, size=size, signed=TRUE,
+		endian=endian)
 	is.na(map) <- map == lres$nodata
 	grid = GridTopology(c(lres$w_cc, lres$s_cc), 
 		c(lres$ewres, lres$nsres), c(lres$ncols,lres$nrows))
 	df <- list(var1=map)
 	names(df) <- colname
-	if (.sp_lt_0.9()) {
-		df1 <- AttributeList(df)
-	} else {
-		df1 <- data.frame(df)
-	}
+	df1 <- data.frame(df)
+# long processing time 071006 - solution centralised in sp
+#        pts = sp:::boguspoints(grid)
+#	pts@bbox[,1] = pts@bbox[,1] - 0.5 * grid@cellsize
+#	pts@bbox[,2] = pts@bbox[,2] + 0.5 * grid@cellsize
+#	res <- new("SpatialGridDataFrame")
+#        slot(res, "data") <- df1
+#	slot(res, "grid") <- grid
+#        slot(res, "grid.index") <- integer(0)
+#        slot(res, "coords") <- slot(pts, "coords")
+#        slot(res, "bbox") <- slot(pts, "bbox")
+#        slot(res, "proj4string") <- proj4string
+
 	res <- SpatialGridDataFrame(grid, data = df1, proj4string=proj4string)
 	res
 }
 
-writeRAST6 <- function(x, vname, zcol = 1, NODATA=-9999, 
+writeRAST6 <- function(x, vname, zcol = 1, NODATA=NULL, 
 	ignore.stderr = FALSE) {
+
 
 	pid <- round(runif(1, 1, 1000))
 	cmd <- paste(paste("g.tempfile", .addexe(), sep=""),
@@ -198,7 +242,7 @@ writeRAST6 <- function(x, vname, zcol = 1, NODATA=-9999,
 	invisible(res)
 }
 
-writeBinGrid <- function(x, fname, attr = 1, na.value = -9999) { 
+writeBinGrid <- function(x, fname, attr = 1, na.value = NULL) { 
 	if (!gridded(x))
 		stop("can only write SpatialGridDataFrame objects to binary grid")
 	x = as(x, "SpatialGridDataFrame")
@@ -208,12 +252,21 @@ writeBinGrid <- function(x, fname, attr = 1, na.value = -9999) {
 	z = x@data[[attr]]
 	if (is.factor(z)) z <- as.numeric(z)
 	if (!is.numeric(z)) stop("only numeric values may be exported")
-	res <- list()
-	res$anull <- formatC(na.value, format="f")
-	if (is.integer(z)) {
-		na.value <- as.integer(na.value)
-		res$anull <- formatC(as.integer(na.value), format="d")
+	if (is.null(na.value)) {
+		na.value <- floor(min(z, na.rm=TRUE)) - 1
+	} else {
+		if (!is.finite(na.value) || !is.numeric(na.value))
+			stop("invalid NODATA value")
+		if (na.value != round(na.value)) 
+			warning("NODATA rounded to integer")
+		na.value <- round(na.value)
 	}
+	res <- list()
+	res$anull <- formatC(na.value, format="d")
+#	if (is.integer(z)) {
+#		na.value <- as.integer(na.value)
+#		res$anull <- formatC(as.integer(na.value), format="d")
+#	}
 	z[is.na(z)] = na.value
 	if (storage.mode(z) == "integer") {
 		sz <- 4
