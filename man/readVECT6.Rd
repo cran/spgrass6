@@ -11,10 +11,11 @@
 \alias{getSites6sp}
 \alias{putSites6}
 \alias{getSites6}
+\alias{cygwin_clean_temp}
 %- Also NEED an '\alias' for EACH other topic documented here.
 \title{Read and write GRASS 6 vector object files}
 \description{
-  \code{readVECT6} moves one GRASS 6.0 vector object file with attribute data through a temporary shapefile to a Spatial*DataFrame object of type determined by the GRASS 6.0 vector object; \code{writeVECT6} moves a Spatial*DataFrame object through a temporary shapefile to a GRASS vector object file. \code{vect2neigh} returns neighbour pairs with shared boundary length as described by Markus Neteler, in \url{https://stat.ethz.ch/pipermail/r-sig-geo/2005-October/000616.html}.
+  \code{readVECT6} moves one GRASS 6.0 vector object file with attribute data through a temporary shapefile to a Spatial*DataFrame object of type determined by the GRASS 6.0 vector object; \code{writeVECT6} moves a Spatial*DataFrame object through a temporary shapefile to a GRASS vector object file. \code{vect2neigh} returns neighbour pairs with shared boundary length as described by Markus Neteler, in \url{https://stat.ethz.ch/pipermail/r-sig-geo/2005-October/000616.html}. \code{cygwin_clean_temp} can be called to try to clean the GRASS mapset-specific temporary directory under cygwin.
 }
 \usage{
 readVECT6(vname, type=NULL, remove.duplicates = TRUE, ignore.stderr = FALSE, with_prj=TRUE, with_c=FALSE)
@@ -27,6 +28,7 @@ putSites6sp(SPDF, vname,  ignore.stderr = FALSE)
 putSites6(df, vname, ignore.stderr = FALSE)
 getSites6sp(vname, ignore.stderr = FALSE, with_prj=TRUE) 
 getSites6(vname, ignore.stderr = FALSE, with_prj=TRUE)
+cygwin_clean_temp(verbose=TRUE, ignore.stderr = FALSE)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -41,28 +43,34 @@ getSites6(vname, ignore.stderr = FALSE, with_prj=TRUE)
   \item{ID}{A valid DB column name for unique identifiers (optional)}
   \item{SPDF}{A SpatialPointsDataFrame to be moved to GRASS6 as vector points}
   \item{df}{A data frame with at least columns named x, y and cat (no z support yet)}
+  \item{verbose}{TRUE, can be set to false}
 }
 \value{
    \code{readVECT6} imports a GRASS6 vector object into a Spatial*DataFrame object with the type determined by the type of the GRASS6 vector object; \code{getSites6} returns a data frame. \code{vect2neigh} returns a data frame object with left and right neighbours and boundary lengths, also given class GRASSneigh and spatial.neighbour (as used in spdep). The incantation to retrieve the neighbours list is \code{sn2listw(vect2neigh())$neighbours}, and to retrieve the boundary lengths: \code{sn2listw(vect2neigh())$weights}. The GRASSneigh object has two other useful attributes: external is a vector giving the length of shared boundary between each polygon and the external area, and total giving each polygon's total boundary length.
 }
 \note{
 Please note that the OGR drivers used may not handle missing data gracefully, and be prepared to have to correct for this manually. For example use of the \code{\link[rgdal]{readOGR}} PostGIS driver directly may perform better than moving the data through the DBF driver used in this function - or a PostgreSQL driver used directly or through ODBC may be a solution. Do not rely on missing values of vector data moving smoothly across the interface.
+
+Please also note that, on Windows and Cygwin systems, the temporary shapefiles are not removed by the interface functions, nor can GRASS remove them on termination - they must for the time being be removed manually. Windows believes that the GDAL/OGR library is still using them.
 }
 \author{Roger S. Bivand, e-mail: \email{Roger.Bivand@nhh.no.}}
 
 \examples{
 if (nchar(Sys.getenv("GISRC")) > 0) {
+  if (Sys.getenv("OSTYPE") == "cygwin") cygwin_clean_temp()
   if (Sys.getenv("OSTYPE") == "msys") system("v.info.exe bugsites")
   else system("v.info bugsites")
-  vInfo("bugsites", ignore.stderr=TRUE)
+  print(vInfo("bugsites", ignore.stderr=TRUE))
   bugs <- readVECT6("bugsites", ignore.stderr=TRUE)
-  summary(bugs)
+  print(summary(bugs))
   writeVECT6(bugs, "newbugs", v.in.ogr_flags="-o --overwrite", ignore.stderr=TRUE)
   if (Sys.getenv("OSTYPE") == "msys") system("v.info.exe newbugs")
   else system("v.info newbugs")
-  vInfo("streams", ignore.stderr=TRUE)
+  nbugs <- readVECT6("newbugs", ignore.stderr=TRUE)
+  print(summary(nbugs))
+  print(vInfo("streams", ignore.stderr=TRUE))
   streams <- readVECT6("streams", type="line,boundary", remove.duplicates=FALSE, ignore.stderr=TRUE)
-  summary(streams)
+  print(summary(streams))
 }
 }
 \keyword{spatial}
