@@ -1,3 +1,30 @@
+2008-06-01 20:24  rsbivand
+
+	* DESCRIPTION, R/bin_link.R, R/vect_link.R, man/readRAST6.Rd,
+	  man/readVECT6.Rd: added plugin facility for reading vectors and
+	  rasters
+
+2008-04-17 23:46  rsbivand
+
+	* ChangeLog, inst/ChangeLog: .First.lib
+
+2008-04-17 23:41  rsbivand
+
+	* DESCRIPTION, R/spgrass6.R, R/zzz.R, man/readVECT6.Rd: .First.lib
+
+2008-04-16 01:03  rsbivand
+
+	* DESCRIPTION, R/bin_link.R, R/spgrass6.R, man/readRAST6.Rd,
+	  man/readVECT6.Rd: native Win release
+
+2008-04-08 11:42  rsbivand
+
+	* ChangeLog, DESCRIPTION, inst/ChangeLog: cygwin unlink
+
+2008-04-08 11:14  rsbivand
+
+	* R/vect_link.R, man/readVECT6.Rd: cygwin unlink
+
 2008-04-07 19:20  rsbivand
 
 	* R/vect_link.R, man/gmeta6.Rd, man/readRAST6.Rd, man/readVECT6.Rd:
