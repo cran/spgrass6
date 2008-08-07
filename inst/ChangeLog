@@ -1,3 +1,19 @@
+2008-08-07 19:22  rsbivand
+
+	* R/bin_link.R: NULL raster handling
+
+2008-08-07 19:02  rsbivand
+
+	* ChangeLog, DESCRIPTION, inst/ChangeLog: NULL raster handling
+
+2008-08-01 18:49  rsbivand
+
+	* R/bin_link.R: all NULL readRAST6
+
+2008-06-27 08:20  rsbivand
+
+	* ChangeLog, inst/ChangeLog: preparing for plugin=NULL default
+
 2008-06-27 08:15  rsbivand
 
 	* R/: bin_link.R, zzz.R: preparing for plugin=NULL default
