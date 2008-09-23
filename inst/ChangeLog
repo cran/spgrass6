@@ -1,3 +1,11 @@
+2008-09-23 11:01  rsbivand
+
+	* R/bin_link.R, man/readRAST6.Rd, DESCRIPTION: writeRAST6 GDAL
+
+2008-09-18 22:54  rsbivand
+
+	* DESCRIPTION, R/bin_link.R, man/readRAST6.Rd: gdal in readRAST6
+
 2008-08-07 19:22  rsbivand
 
 	* R/bin_link.R: NULL raster handling
