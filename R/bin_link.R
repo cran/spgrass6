@@ -98,35 +98,36 @@ readRAST6 <- function(vname, cat=NULL, ignore.stderr = FALSE,
 		    names(lres) <- colnames(res)
 		    if (!is.numeric(lres$min) || 
 			!is.finite(as.double(lres$min))) 
-			    vNODATA <- as.integer(999)
+			    NODATA <- as.integer(999)
 		    else {
 			lres$min <- floor(as.double(lres$min))
-		        vNODATA <- floor(lres$min) - 1
+		        NODATA <- floor(lres$min) - 1
 		    }
 		} else {
 		    if (!is.finite(NODATA) || !is.numeric(NODATA))
 			stop("invalid NODATA value")
 		    if (NODATA != round(NODATA)) 
 			warning("NODATA rounded to integer")
-		    vNODATA <- round(NODATA)
+		    NODATA <- round(NODATA)
 		}
 		if (useGDAL && G63) {
 		    type <- ifelse (to_int, "Int32", "Float32")
 		    cmd <- paste(paste("r.out.gdal", .addexe(), sep=""),
                         " --quiet input=", vname[i], " output=", gtmpfl11,
-                        " type=", type, " nodata=", vNODATA, sep="")
+                        " type=", type, " nodata=", NODATA, sep="")
 
 # 061107 Dylan Beaudette NODATA
 
 		    tull <- ifelse(.Platform$OS.type == "windows", system(cmd), 
 			system(cmd, ignore.stderr=ignore.stderr))
 
-		    res <- readGDAL(rtmpfl11, p4s=getLocationProj())
+		    res <- readGDAL(rtmpfl11, p4s=getLocationProj(), 
+			silent=ignore.stderr)
 		    names(res) <- vname[i]
 		} else {
 		    cmd <- paste(paste("r.out.bin", .addexe(), sep=""),
                         " -b input=", vname[i], " output=", gtmpfl11,
-                        " null=", vNODATA, sep="")
+                        " null=", NODATA, sep="")
 
 # 061107 Dylan Beaudette NODATA
 
@@ -246,24 +247,13 @@ readBinGrid <- function(fname, colname=basename(fname),
 	df <- list(var1=map)
 	names(df) <- colname
 	df1 <- data.frame(df)
-# long processing time 071006 - solution centralised in sp
-#        pts = sp:::boguspoints(grid)
-#	pts@bbox[,1] = pts@bbox[,1] - 0.5 * grid@cellsize
-#	pts@bbox[,2] = pts@bbox[,2] + 0.5 * grid@cellsize
-#	res <- new("SpatialGridDataFrame")
-#        slot(res, "data") <- df1
-#	slot(res, "grid") <- grid
-#        slot(res, "grid.index") <- integer(0)
-#        slot(res, "coords") <- slot(pts, "coords")
-#        slot(res, "bbox") <- slot(pts, "bbox")
-#        slot(res, "proj4string") <- proj4string
 
 	res <- SpatialGridDataFrame(grid, data = df1, proj4string=proj4string)
 	res
 }
 
 writeRAST6 <- function(x, vname, zcol = 1, NODATA=NULL, 
-	ignore.stderr = FALSE, useGDAL=FALSE) {
+	ignore.stderr = FALSE, useGDAL=FALSE, overwrite=FALSE) {
 
 
 	pid <- round(runif(1, 1, 1000))
@@ -310,7 +300,8 @@ writeRAST6 <- function(x, vname, zcol = 1, NODATA=NULL,
 	    res <- writeGDAL(x[zcol], fname=rtmpfl11, type=type, 
 		mvFlag = NODATA)
 
-	    cmd <- paste(paste("r.in.gdal", .addexe(), sep=""),
+	    cmd <- paste(paste("r.in.gdal", .addexe(), sep=""), 
+		ifelse(overwrite, " --overwrite", ""),
                 " input=", gtmpfl11, " output=", vname, sep="")
 	
 	    tull <- ifelse(.Platform$OS.type == "windows", 
@@ -320,7 +311,8 @@ writeRAST6 <- function(x, vname, zcol = 1, NODATA=NULL,
 	    res <- writeBinGrid(x, rtmpfl11, attr = zcol, na.value = NODATA)
 
 	    cmd <- paste(paste("r.in.bin", .addexe(), sep=""),
-                " ", res$flag, " input=", gtmpfl11, " output=", 
+                " ", res$flag, ifelse(overwrite, " --overwrite", ""),
+		" input=", gtmpfl11, " output=", 
 		vname, " bytes=", res$bytes, " north=", res$north, 
 		" south=", res$south, " east=", res$east, " west=", 
 		res$west, " rows=", res$rows, " cols=", res$cols, " anull=", 
