@@ -26,12 +26,14 @@ readVECT6 <- function(vname, type=NULL, plugin=NULL, remove.duplicates=TRUE, ign
 	}
 
 	pid <- as.integer(round(runif(1, 1, 1000)))
-	cmd <- paste(paste("g.tempfile", .addexe(), sep=""),
-                    " pid=", pid, sep="")
+#	cmd <- paste(paste("g.tempfile", .addexe(), sep=""),
+#                    " pid=", pid, sep="")
 
-	gtmpfl1 <- dirname(ifelse(.Platform$OS.type == "windows", 
-		system(cmd, intern=TRUE), system(cmd, 
-		intern=TRUE, ignore.stderr=ignore.stderr)))
+	gtmpfl1 <- dirname(execGRASS("g.tempfile", parameters=list(pid=pid),
+            intern=TRUE, ignore.stderr=ignore.stderr))
+#ifelse(.Platform$OS.type == "windows", 
+#		system(cmd, intern=TRUE), system(cmd, 
+#		intern=TRUE, ignore.stderr=ignore.stderr)))
 	rtmpfl1 <- ifelse(.Platform$OS.type == "windows" &&
                 (Sys.getenv("OSTYPE") == "cygwin"), 
 		system(paste("cygpath -w", gtmpfl1, sep=" "), intern=TRUE), 
@@ -40,17 +42,23 @@ readVECT6 <- function(vname, type=NULL, plugin=NULL, remove.duplicates=TRUE, ign
 	shname <- substring(vname, 1, ifelse(nchar(vname) > 8, 8, 
 		nchar(vname)))
 
-	if (with_prj) E <- " -e"
-	else E <- ""
-	if (with_c) E <- paste(E, " -c")
+#	if (with_prj) E <- " -e"
+#	else E <- ""
+#	if (with_c) E <- paste(E, " -c")
 
-	cmd <- paste(paste("v.out.ogr", .addexe(), sep=""),
-                " ", E, " input=", vname, " type=", type, 
-		" dsn=", gtmpfl1, " olayer=", shname, " format=ESRI_Shapefile", 
-		sep="")
+#	cmd <- paste(paste("v.out.ogr", .addexe(), sep=""),
+#                " ", E, " input=", vname, " type=", type, 
+#		" dsn=", gtmpfl1, " olayer=", shname, " format=ESRI_Shapefile", 
+#		sep="")
 
-	tull <- ifelse(.Platform$OS.type == "windows", system(cmd), 
-		system(cmd, ignore.stderr=ignore.stderr))
+#	tull <- ifelse(.Platform$OS.type == "windows", system(cmd), 
+#		system(cmd, ignore.stderr=ignore.stderr))
+        flags <- NULL
+        if (with_prj) flags <- "e"
+        if (with_c) flags <- c(flags, "c")
+        execGRASS("v.out.ogr", flags=flags, parameters=list(input=vname,
+            type=type, dsn=gtmpfl1, olayer=shname, format="ESRI_Shapefile"),
+            ignore.stderr=ignore.stderr)
 
 	res <- readOGR(dsn=rtmpfl1, layer=shname, verbose=!ignore.stderr)
 
@@ -65,14 +73,18 @@ readVECT6 <- function(vname, type=NULL, plugin=NULL, remove.duplicates=TRUE, ign
 			if (type != "area" && type != "line")
 			    stop("try remove.duplicates=FALSE")
 			ndata <- as(res, "data.frame")[!dups,,drop=FALSE]
-			row.names(ndata) <- ndata$cat
+                        cand <- as.character(ndata$cat)
+                        cand[is.na(cand)] <- "na"
+			row.names(ndata) <- cand
 			if (type == "area") {
 				pls <- slot(res, "polygons")
 			} else if (type == "line") {
 				pls <- slot(res, "lines")
 			}
 			p4s <- proj4string(res)
-			IDs <- res$cat
+			IDs <- as.character(res$cat)
+			IDs[is.na(IDs)] <- "na"
+#			IDs <- res$cat
 			tab <- table(factor(IDs))
 			n <- length(tab)
 			if (n + sum(dups) != length(pls))
@@ -175,12 +187,14 @@ writeVECT6 <- function(SDF, vname, #factor2char = TRUE,
 	if (is.null(type)) stop("Unknown data class")
 
 	pid <- as.integer(round(runif(1, 1, 1000)))
-	cmd <- paste(paste("g.tempfile", .addexe(), sep=""),
-                    " pid=", pid, sep="")
+#	cmd <- paste(paste("g.tempfile", .addexe(), sep=""),
+#                    " pid=", pid, sep="")
 
-	gtmpfl1 <- dirname(ifelse(.Platform$OS.type == "windows", 
-		system(cmd, intern=TRUE), system(cmd, 
-		intern=TRUE, ignore.stderr=ignore.stderr)))
+#	gtmpfl1 <- dirname(ifelse(.Platform$OS.type == "windows", 
+#		system(cmd, intern=TRUE), system(cmd, 
+#		intern=TRUE, ignore.stderr=ignore.stderr)))
+	gtmpfl1 <- dirname(execGRASS("g.tempfile", parameters=list(pid=pid),
+            intern=TRUE, ignore.stderr=ignore.stderr))
 	rtmpfl1 <- ifelse(.Platform$OS.type == "windows" &&
                 (Sys.getenv("OSTYPE") == "cygwin"), 
 		system(paste("cygpath -w", gtmpfl1, sep=" "), intern=TRUE), 
@@ -202,12 +216,17 @@ writeVECT6 <- function(SDF, vname, #factor2char = TRUE,
 
 	writeOGR(SDF, dsn=rtmpfl1, layer=shname, driver="ESRI Shapefile")
 
-	cmd <- paste(paste("v.in.ogr", .addexe(), sep=""),
-                    " ", v.in.ogr_flags, " dsn=", gtmpfl1, 
-		" output=", vname, " layer=", shname, sep="")
+#	cmd <- paste(paste("v.in.ogr", .addexe(), sep=""),
+#                    " ", v.in.ogr_flags, " dsn=", gtmpfl1, 
+#		" output=", vname, " layer=", shname, sep="")
 
-	tull <- ifelse(.Platform$OS.type == "windows", system(cmd), 
-		system(cmd, ignore.stderr=ignore.stderr))
+#	tull <- ifelse(.Platform$OS.type == "windows", system(cmd), 
+#		system(cmd, ignore.stderr=ignore.stderr))
+
+	execGRASS("v.in.ogr", flags=v.in.ogr_flags,
+	    parameters=list(dsn=gtmpfl1, output=vname, layer=shname),
+	    ignore.stderr=ignore.stderr)
+
 	if (.Platform$OS.type != "windows") 
             unlink(paste(rtmpfl1, list.files(rtmpfl1, pattern=shname), 
 		sep=.Platform$file.sep))
@@ -215,10 +234,12 @@ writeVECT6 <- function(SDF, vname, #factor2char = TRUE,
 }
 
 vInfo <- function(vname, ignore.stderr = FALSE) {
-	cmd <- paste(paste("v.info", .addexe(), sep=""),
-                    " map=", vname, sep="")
-	if(.Platform$OS.type == "windows") vinfo0 <- system(cmd, intern=TRUE)
-	else vinfo0 <- system(cmd, intern=TRUE, ignore.stderr=ignore.stderr)
+#	cmd <- paste(paste("v.info", .addexe(), sep=""),
+#                    " map=", vname, sep="")
+#	if(.Platform$OS.type == "windows") vinfo0 <- system(cmd, intern=TRUE)
+#	else vinfo0 <- system(cmd, intern=TRUE, ignore.stderr=ignore.stderr)
+	vinfo0 <- execGRASS("v.info", parameters=list(map=vname), intern=TRUE,
+            ignore.stderr=ignore.stderr)
 
 	m0 <- grep("Number of points", vinfo0)
 	m1 <- grep("Number of centroids", vinfo0)
@@ -235,29 +256,40 @@ vInfo <- function(vname, ignore.stderr = FALSE) {
 }
 
 vColumns <- function(vname, ignore.stderr = TRUE) {
-	cmd <- paste(paste("v.info", .addexe(), sep=""),
-                    " -c map=", vname, sep="")
-	if(.Platform$OS.type == "windows") vinfo0 <- system(cmd, intern=TRUE)
-	else vinfo0 <- system(cmd, intern=TRUE, ignore.stderr=ignore.stderr)
+#	cmd <- paste(paste("v.info", .addexe(), sep=""),
+#                    " -c map=", vname, sep="")
+#	if(.Platform$OS.type == "windows") vinfo0 <- system(cmd, intern=TRUE)
+#	else vinfo0 <- system(cmd, intern=TRUE, ignore.stderr=ignore.stderr)
+	vinfo0 <- execGRASS("v.info", flags="c", parameters=list(map=vname),
+            intern=TRUE, ignore.stderr=ignore.stderr)       
 	con <- textConnection(vinfo0)
-	if(.Platform$OS.type == "windows") res <- read.table(con, 
-		header=FALSE, sep="|", skip=1)
-	else res <- read.table(con, header=FALSE, sep="|")
+#	if(.Platform$OS.type == "windows") res <- read.table(con, 
+#		header=FALSE, sep="|", skip=1)
+#	else 
+        res <- read.table(con, header=FALSE, sep="|")
 	close(con)
 	names(res) <- c("storageType", "name")
 	res
 }
 
 vDataCount <- function(vname, ignore.stderr = TRUE) {
-	cmd <- paste(paste("v.db.select", .addexe(), sep=""),
-                    " -c map=", vname, " column=cat", sep="")
-	if(.Platform$OS.type == "windows") tull <- system(cmd, intern=TRUE)
-	else tull <- system(cmd, intern=TRUE, ignore.stderr=ignore.stderr)
+#	cmd <- paste(paste("v.db.select", .addexe(), sep=""),
+#                    " -c map=", vname, " column=cat", sep="")
+#	if(.Platform$OS.type == "windows") tull <- system(cmd, intern=TRUE)
+#	else tull <- system(cmd, intern=TRUE, ignore.stderr=ignore.stderr)
+        column <- "column" %in% parseGRASS("v.db.select")$pnames
+        if (column) tull <- execGRASS("v.db.select", flags="c",
+            parameters=list(map=vname, column="cat"), intern=TRUE,
+            ignore.stderr=ignore.stderr)
+        else tull <- execGRASS("v.db.select", flags="c",
+            parameters=list(map=vname, columns="cat"), intern=TRUE,
+            ignore.stderr=ignore.stderr)
 	n <- length(tull)
 	n
 }
 
 getSites6 <- function(vname, ignore.stderr = FALSE, with_prj=TRUE) {
+        .Deprecated("readVECT6", package="spgrass6")
 # based on suggestions by Miha Staut using v.out.ascii and v.db.select,
 # modified to avoid cygwin problems
 	SPDF <- getSites6sp(vname, ignore.stderr=ignore.stderr, 
@@ -267,6 +299,7 @@ getSites6 <- function(vname, ignore.stderr = FALSE, with_prj=TRUE) {
 }
 
 getSites6sp <- function(vname, ignore.stderr = FALSE, with_prj=TRUE) {
+        .Deprecated("readVECT6", package="spgrass6")
 	res <- readVECT6(vname=vname, ignore.stderr=ignore.stderr, 
 		with_prj=with_prj)
 	res
@@ -276,12 +309,14 @@ getSites6sp <- function(vname, ignore.stderr = FALSE, with_prj=TRUE) {
 putSites6 <- function(df, vname, ignore.stderr = FALSE) {
 # based on suggestions by Miha Staut using v.out.ascii and v.db.select,
 # modified to avoid cygwin problems
+        .Deprecated("writeVECT6", package="spgrass6")
 	coordinates(df) <- c("x", "y")
 	putSites6sp(df, vname, ignore.stderr=ignore.stderr)
 }
 
 putSites6sp <- function(SPDF, vname, #factor2char = TRUE, 
 	ignore.stderr = FALSE) {
+        .Deprecated("writeVECT6", package="spgrass6")
 	writeVECT6(SPDF, vname, #factor2char=factor2char, 
 		ignore.stderr=ignore.stderr)
 }
