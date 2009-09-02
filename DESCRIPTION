@@ -1,6 +1,6 @@
 Package: spgrass6
-Version: 0.6-7
-Date: 2009-08-14
+Version: 0.6-8
+Date: 2009-09-02
 Title: Interface between GRASS 6 geographical information system and R
 Author: Roger Bivand
 Maintainer: Roger Bivand <Roger.Bivand@nhh.no>
@@ -15,6 +15,6 @@ License: GPL (>= 2)
 URL: http://grass.osgeo.org/
 Collate: AAA.R spgrass6.R bin_link.R vect_link.R initGRASS.R xml1.R
         zzz.R
-Packaged: 2009-08-15 12:16:53 UTC; rsb
+Packaged: 2009-09-02 13:38:40 UTC; rsb
 Repository: CRAN
-Date/Publication: 2009-08-16 15:15:11
+Date/Publication: 2009-09-03 09:26:05
