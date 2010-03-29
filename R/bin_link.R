@@ -3,7 +3,7 @@
 #
 
 readRAST6 <- function(vname, cat=NULL, ignore.stderr = FALSE, 
-	NODATA=NULL, plugin=NULL, mapset=NULL, useGDAL=TRUE) {
+	NODATA=NULL, plugin=NULL, mapset=NULL, useGDAL=TRUE, close_OK=TRUE) {
 	if (!is.null(cat))
 		if(length(vname) != length(cat)) 
 			stop("vname and cat not same length")
@@ -86,6 +86,8 @@ readRAST6 <- function(vname, cat=NULL, ignore.stderr = FALSE,
 
 		to_int <- length(which(unlist(strsplit(
 			whCELL, "=")) == "CELL")) > 0
+                Dcell <- length(which(unlist(strsplit(
+			whCELL, "=")) == "DCELL")) > 0
 
 		gtmpfl1 <- dirname(execGRASS("g.tempfile",
 		    parameters=list(pid=pid), intern=TRUE,
@@ -126,7 +128,8 @@ readRAST6 <- function(vname, cat=NULL, ignore.stderr = FALSE,
 		    NODATA <- round(NODATA)
 		}
 		if (useGDAL && G63) {
-		    type <- ifelse (to_int, "Int32", "Float32")
+		    type <- ifelse (to_int, "Int32",
+                        ifelse(Dcell, "Float64", "Float32"))
 
                     if (Cflag) execGRASS("r.out.gdal", flags=c("c", "quiet"),
 			parameters=list(input=vname[i], output=gtmpfl11,
@@ -170,7 +173,7 @@ readRAST6 <- function(vname, cat=NULL, ignore.stderr = FALSE,
 		}
 	}
 
-	closeAllConnections()
+	if (close_OK) closeAllConnections()
 
 	if (!is.null(cat)) {
 		for (i in seq(along=cat)) {
