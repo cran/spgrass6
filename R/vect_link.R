@@ -1,14 +1,15 @@
-# Interpreted GRASS 6 interface functions
-# Copyright (c) 2005-9 Roger S. Bivand
+# Interpreted GRASS 6+ interface functions
+# Copyright (c) 2005-2010 Roger S. Bivand
 #
 readVECT6 <- function(vname, layer, type=NULL, plugin=NULL,
         remove.duplicates=TRUE, 
 	ignore.stderr = FALSE, with_prj=TRUE, with_c=FALSE, mapset=NULL, 
-	pointDropZ=FALSE) {
+	pointDropZ=FALSE, driver="ESRI Shapefile") {
 
     G7 <- execGRASS("g.version", intern=TRUE) > "GRASS 7"
     if (missing(layer)) layer <- 1L
     if (G7) layer <- as.character(layer)
+    if (driver == "GRASS") plugin <- TRUE
 
     if (is.null(plugin)) {
         ogrD <- ogrDrivers()$name
@@ -38,6 +39,20 @@ readVECT6 <- function(vname, layer, type=NULL, plugin=NULL,
                 verbose=!ignore.stderr)
         }
     } else {
+        ogrD <- ogrDrivers()$name
+	if (!(driver %in% ogrD))
+            stop(paste("Requested driver", driver, "not available in rgdal"))
+        ogrDGRASS <- execGRASS("v.in.ogr", flags="f", intern=TRUE,
+            ignore.stderr=ignore.stderr)
+        ogrDGRASSs <- strsplit(ogrDGRASS, ": ")
+        if (!(driver %in% sapply(ogrDGRASSs, "[", 2)))
+            stop(paste("Requested driver", driver, "not available in GRASS"))
+        fDrivers <- c("GML", "SQLite")
+        dDrivers <- c("ESRI_Shapefile", "MapInfo_File")
+        if (!(gsub(" ", "_", driver) %in% c(fDrivers, dDrivers)))
+            stop(paste("Requested driver", driver, "not supported"))
+        is_dDriver <- TRUE
+        if (gsub(" ", "_", driver) %in% fDrivers) is_dDriver <- FALSE
 	vinfo <- vInfo(vname)
 	types <- names(vinfo)[which(vinfo > 0)]
 	if (is.null(type)) {
@@ -62,19 +77,30 @@ readVECT6 <- function(vname, layer, type=NULL, plugin=NULL,
         flags <- NULL
         if (with_prj) flags <- "e"
         if (with_c) flags <- c(flags, "c")
+        if (is_dDriver){
+            GDSN <- gtmpfl1
+            RDSN <- rtmpfl1
+            LAYER <- shname
+        } else {
+            GDSN <- paste(gtmpfl1, shname, sep=.Platform$file.sep)
+            RDSN <- paste(rtmpfl1, shname, sep=.Platform$file.sep)
+            LAYER <- shname
+        }
         execGRASS("v.out.ogr", flags=flags, parameters=list(input=vname,
-            type=type, layer=layer, dsn=gtmpfl1, olayer=shname,
-            format="ESRI_Shapefile"), ignore.stderr=ignore.stderr)
+            type=type, layer=layer, dsn=GDSN, olayer=LAYER,
+            format=gsub(" ", "_", driver)), ignore.stderr=ignore.stderr)
 
         if (sss[1] >= "0.6" && as.integer(sss[2]) > 7) {
-	    res <- readOGR(dsn=rtmpfl1, layer=shname, verbose=!ignore.stderr, 
+	    res <- readOGR(dsn=RDSN, layer=LAYER, verbose=!ignore.stderr, 
 	        pointDropZ=pointDropZ)
         } else {
 	    res <- readOGR(dsn=rtmpfl1, layer=shname, verbose=!ignore.stderr)           }
 
-	if (.Platform$OS.type != "windows") 
+	if (.Platform$OS.type != "windows") {
             unlink(paste(rtmpfl1, list.files(rtmpfl1, pattern=shname), 
-		sep=.Platform$file.sep))
+	        sep=.Platform$file.sep))
+        }
+        
 	if (remove.duplicates && type != "point") {
 		dups <- duplicated(slot(res, "data"))
 		if (any(dups)) {
@@ -187,8 +213,23 @@ readVECT6 <- function(vname, layer, type=NULL, plugin=NULL,
 }
 
 writeVECT6 <- function(SDF, vname, #factor2char = TRUE, 
-	v.in.ogr_flags=NULL, ignore.stderr = FALSE) {
+	v.in.ogr_flags=NULL, ignore.stderr = FALSE, driver="ESRI Shapefile") {
 
+        ogrD <- ogrDrivers()$name
+	if (!(driver %in% ogrD))
+            stop(paste("Requested driver", driver, "not available in rgdal"))
+        ogrDGRASS <- execGRASS("v.in.ogr", flags="f", intern=TRUE,
+            ignore.stderr=ignore.stderr)
+        ogrDGRASSs <- strsplit(ogrDGRASS, ": ")
+        if (!(driver %in% sapply(ogrDGRASSs, "[", 2)))
+            stop(paste("Requested driver", driver, "not available in GRASS"))
+        fDrivers <- c("GML", "SQLite")
+        dDrivers <- c("ESRI_Shapefile", "MapInfo_File")
+        if (!(gsub(" ", "_", driver) %in% c(fDrivers, dDrivers)))
+            stop(paste("Requested driver", driver, "not supported"))
+        is_dDriver <- TRUE
+        if (gsub(" ", "_", driver) %in% fDrivers) is_dDriver <- FALSE
+        sss <- strsplit(packageDescription("rgdal")$Version, "-")[[1]]
 	type <- NULL
 	if (class(SDF) == "SpatialPointsDataFrame") type <- "point"
 	if (class(SDF) == "SpatialLinesDataFrame") type <- "line"
@@ -206,17 +247,27 @@ writeVECT6 <- function(SDF, vname, #factor2char = TRUE,
 	shname <- substring(vname, 1, ifelse(nchar(vname) > 8, 8, 
 		nchar(vname)))
 
+        if (is_dDriver){
+            GDSN <- gtmpfl1
+            RDSN <- rtmpfl1
+            LAYER <- shname
+        } else {
+            GDSN <- paste(gtmpfl1, shname, sep=.Platform$file.sep)
+            RDSN <- paste(rtmpfl1, shname, sep=.Platform$file.sep)
+            LAYER <- shname
+        }
 
-	writeOGR(SDF, dsn=rtmpfl1, layer=shname, driver="ESRI Shapefile")
+	writeOGR(SDF, dsn=RDSN, layer=LAYER, driver=driver)
 
 
 	execGRASS("v.in.ogr", flags=v.in.ogr_flags,
-	    parameters=list(dsn=gtmpfl1, output=vname, layer=shname),
+	    parameters=list(dsn=GDSN, output=vname, layer=LAYER),
 	    ignore.stderr=ignore.stderr)
 
-	if (.Platform$OS.type != "windows") 
+	if (.Platform$OS.type != "windows") {
             unlink(paste(rtmpfl1, list.files(rtmpfl1, pattern=shname), 
-		sep=.Platform$file.sep))
+	        sep=.Platform$file.sep))
+        }
 
 }
 

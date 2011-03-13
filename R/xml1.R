@@ -159,7 +159,7 @@ doGRASS <- function(cmd, flags=NULL, parameters=NULL) {
             stop(paste("Invalid flag value:", flags[is.na(fm)]))
         }
         suppr_req <- as.logical(sapply(pcmd$flags, "[", "suppr_req"))
-        if (!suppress_required && any(suppr_req)) suppress_required <- TRUE
+        if (!suppress_required && any(suppr_req[fm])) suppress_required <- TRUE
         dble_dash <- c("verbose", "overwrite", "quiet")
         dbm <- na.omit(match(dble_dash, flags))
         if (length(dbm) > 0) flags[dbm] <- paste("-", flags[dbm], sep="")
@@ -206,7 +206,11 @@ doGRASS <- function(cmd, flags=NULL, parameters=NULL) {
                     stop(paste("Parameter <", names(parameters)[i],
                     "> does not have string value", sep=""))
 # string space protection 091108 Martin Mainzer
-                if (length(grep(" ", parameters[[i]])) > 0) {
+                Space <- length(grep(" ", parameters[[i]])) > 0
+# Rainer Krug 110128
+                Paran <- length(grep("\\(", parameters[[i]])) > 0 ||
+                    length(grep(")", parameters[[i]])) > 0
+                if (Space || Paran) {
 # extra protection against existing escaping of quotes 100422
                   if (length(grep("\"", parameters[[i]])) == 0) {
                     parameters[[i]] <- paste("\"", parameters[[i]], "\"",
