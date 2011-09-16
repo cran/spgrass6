@@ -1,14 +1,24 @@
 # Interpreted GRASS 6+ interface functions
-# Copyright (c) 2005-2010 Roger S. Bivand
+# Copyright (c) 2005-2011 Roger S. Bivand
 #
 
-readRAST6 <- function(vname, cat=NULL, ignore.stderr = FALSE, 
-	NODATA=NULL, plugin=NULL, mapset=NULL, useGDAL=TRUE, close_OK=TRUE,
+readRAST6 <- function(vname, cat=NULL, ignore.stderr = NULL, 
+	NODATA=NULL, plugin=NULL, mapset=NULL, useGDAL=NULL, close_OK=TRUE,
         drivername="GTiff") {
 	if (!is.null(cat))
 		if(length(vname) != length(cat)) 
 			stop("vname and cat not same length")
+    
+    if (is.null(plugin))
+        plugin <- get("plugin", env = .GRASS_CACHE)
+    stopifnot(is.logical(plugin)|| is.null(plugin))
     if (!is.null(plugin) && plugin && length(vname) > 1) plugin <- FALSE
+    if (is.null(ignore.stderr))
+        ignore.stderr <- get("ignore.stderr", env = .GRASS_CACHE)
+    stopifnot(is.logical(ignore.stderr))
+    if (is.null(useGDAL))
+        useGDAL <- get("useGDAL", env = .GRASS_CACHE)
+    stopifnot(is.logical(useGDAL))
     gdalD <- gdalDrivers()$name
     if (is.null(plugin)) {
 	plugin <- "GRASS" %in% gdalD
@@ -81,7 +91,7 @@ readRAST6 <- function(vname, cat=NULL, ignore.stderr = FALSE,
 
 
 		whCELL <- execGRASS("r.info", flags="t",
-		    parameters=list(map=vname[i]), intern=TRUE, 
+		    map=vname[i], intern=TRUE, 
 		    ignore.stderr=ignore.stderr)
 
 		to_int <- length(which(unlist(strsplit(
@@ -90,7 +100,7 @@ readRAST6 <- function(vname, cat=NULL, ignore.stderr = FALSE,
 			whCELL, "=")) == "DCELL")) > 0
 
 		gtmpfl1 <- dirname(execGRASS("g.tempfile",
-		    parameters=list(pid=pid), intern=TRUE,
+		    pid=pid, intern=TRUE,
 		    ignore.stderr=ignore.stderr))
 		rtmpfl1 <- ifelse(.Platform$OS.type == "windows" &&
                         (Sys.getenv("OSTYPE") == "cygwin"), 
@@ -110,7 +120,7 @@ readRAST6 <- function(vname, cat=NULL, ignore.stderr = FALSE,
 		}
 		if (useGDAL && G63) {
                     gdalDGRASS <- execGRASS("r.out.gdal", flags="l",
-                        intern=TRUE, ignore.stderr=TRUE)
+                        intern=TRUE, ignore.stderr=ignore.stderr)
 	            if (!(drivername %in% gdalD))
                         stop(paste("Requested driver", drivername,
                             "not available in rgdal"))
@@ -137,7 +147,7 @@ readRAST6 <- function(vname, cat=NULL, ignore.stderr = FALSE,
 # 071009 Markus Neteler's idea to use range
 	  	    if (is.null(NODATA)) {
 		      tx <- execGRASS("r.info", flags="r",
-		        parameters=list(map=vname[i]), intern=TRUE, 
+		        map=vname[i], intern=TRUE, 
 		        ignore.stderr=ignore.stderr)
 		      tx <- gsub("=", ":", tx)
 		      con <- textConnection(tx)
@@ -155,8 +165,8 @@ readRAST6 <- function(vname, cat=NULL, ignore.stderr = FALSE,
 		      }
                     }
 		    execGRASS("r.out.bin", flags="b", 
-			parameters=list(input=vname[i], output=gtmpfl11, 
-			null=as.integer(NODATA)), ignore.stderr=ignore.stderr)
+			input=vname[i], output=gtmpfl11, 
+			null=as.integer(NODATA), ignore.stderr=ignore.stderr)
 
 		    res <- readBinGrid(rtmpfl11, colname=vname[i], 
 			proj4string=p4,	integer=to_int)
@@ -191,7 +201,7 @@ readRAST6 <- function(vname, cat=NULL, ignore.stderr = FALSE,
 
 				rSTATS <- execGRASS("r.stats",
 				    flags=c("l", "quiet"),
-				    parameters=list(input=vname[i]),
+				    input=vname[i],
 				    intern=TRUE, ignore.stderr=ignore.stderr)
 
 				cats <- strsplit(rSTATS, " ")
@@ -264,12 +274,18 @@ readBinGrid <- function(fname, colname=basename(fname),
 }
 
 writeRAST6 <- function(x, vname, zcol = 1, NODATA=NULL, 
-	ignore.stderr = FALSE, useGDAL=TRUE, overwrite=FALSE, flags=NULL,
+	ignore.stderr = NULL, useGDAL=NULL, overwrite=FALSE, flags=NULL,
         drivername="GTiff") {
 
 
+        if (is.null(ignore.stderr))
+            ignore.stderr <- get("ignore.stderr", env = .GRASS_CACHE)
+        stopifnot(is.logical(ignore.stderr))
+        if (is.null(useGDAL))
+            useGDAL <- get("useGDAL", env = .GRASS_CACHE)
+        stopifnot(is.logical(useGDAL))
 	pid <- as.integer(round(runif(1, 1, 1000)))
-	gtmpfl1 <- dirname(execGRASS("g.tempfile", parameters=list(pid=pid),
+	gtmpfl1 <- dirname(execGRASS("g.tempfile", pid=pid,
 	    intern=TRUE, ignore.stderr=ignore.stderr))
 
 	rtmpfl1 <- ifelse(.Platform$OS.type == "windows" &&
@@ -290,7 +306,7 @@ writeRAST6 <- function(x, vname, zcol = 1, NODATA=NULL,
 	if (useGDAL && G63) {
             gdalD <- gdalDrivers()$name
             gdalDGRASS <- execGRASS("r.out.gdal", flags="l",
-                intern=TRUE, ignore.stderr=TRUE)
+                intern=TRUE, ignore.stderr=ignore.stderr)
 	    if (!(drivername %in% gdalD))
                 stop(paste("Requested driver", drivername,
                     "not available in rgdal"))
@@ -315,8 +331,8 @@ writeRAST6 <- function(x, vname, zcol = 1, NODATA=NULL,
 	    res <- writeGDAL(x[zcol], fname=rtmpfl11, type=type, 
 		drivername=drivername, mvFlag = NODATA)
 
-	    execGRASS("r.in.gdal", flags=flags, parameters=list(input=gtmpfl11,
-		output=vname), ignore.stderr=ignore.stderr)
+	    execGRASS("r.in.gdal", flags=flags, input=gtmpfl11,
+		output=vname, ignore.stderr=ignore.stderr)
 
             DS <- GDAL.open(rtmpfl11, read.only=FALSE)
             deleteDataset(DS)
@@ -326,12 +342,12 @@ writeRAST6 <- function(x, vname, zcol = 1, NODATA=NULL,
 	    flags <- c(res$flag, flags)
 	    
 	    execGRASS("r.in.bin", flags=flags,
-                parameters=list(input=gtmpfl11,
+                input=gtmpfl11,
 		output=vname, bytes=as.integer(res$bytes), 
 		north=as.numeric(res$north), south=as.numeric(res$south), 
 		east=as.numeric(res$east), west=as.numeric(res$west), 
 		rows=as.integer(res$rows), cols=as.integer(res$cols), 
-		anull=as.numeric(res$anull)), ignore.stderr=ignore.stderr)
+		anull=as.numeric(res$anull), ignore.stderr=ignore.stderr)
 
 	    unlink(paste(rtmpfl1, list.files(rtmpfl1, pattern=fid), 
 		sep=.Platform$file.sep))

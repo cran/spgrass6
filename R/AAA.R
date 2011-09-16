@@ -37,14 +37,19 @@ if(!exists("Sys.setenv", envir = baseenv())) Sys.setenv <- Sys.putenv
   assign("addEXE", res, envir=.GRASS_CACHE)
   assign("WN_bat", "", envir=.GRASS_CACHE)
 
+  assign("ignore.stderr", FALSE, envir=.GRASS_CACHE)
+  assign("useGDAL", TRUE, envir=.GRASS_CACHE)
+  assign("stop_on_no_flags_paras", TRUE, envir=.GRASS_CACHE)
+  assign("plugin", NULL, envir=.GRASS_CACHE)
+  assign("echoCmd", FALSE, envir=.GRASS_CACHE)
+  assign("GV", "", envir=.GRASS_CACHE)
+
+
   if (nchar(gisrc) == 0) gv <- "(GRASS not running)"
   else {
-    gv <- Sys.getenv("GRASS_VERSION")
-    if (nchar(gv) == 0) {
-      tull <- ifelse(.Platform$OS.type == "windows",
-        gv <- system(paste("g.version", .addexe(), sep=""), intern=TRUE), 
-        gv <- system("g.version", intern=TRUE, ignore.stderr=FALSE))
-    }
+      gv <- system(paste("g.version", get("addEXE", envir=.GRASS_CACHE),
+        sep=""),  intern=TRUE)
+    assign("GV", gv, envir=.GRASS_CACHE)
     if(nchar(loc) == 0) {
       gisrc <- ifelse(.Platform$OS.type == "windows" &&
                 (Sys.getenv("OSTYPE") == "cygwin"), 
@@ -59,8 +64,8 @@ if(!exists("Sys.setenv", envir = baseenv())) Sys.setenv <- Sys.putenv
     ifelse(nchar(loc) == 0, '', paste('and location: ', loc, '\n', sep="")),
       sep="")
   packageStartupMessage(Smess, appendLF = FALSE)
-  require("rgdal")
-  require("XML")
+#  require("rgdal")
+#  require("XML")
   
 #  .GRASS_CACHE <- new.env(FALSE, parent=globalenv())
 }

@@ -73,6 +73,14 @@ parseGRASS <- function(cmd) {
             pv <- xmlAttrs(obj)
             pvCh <- xmlChildren(obj)
             pv <- c(pv, xmlValue(pvCh[["description"]]))
+            default <- pvCh[["default"]]
+            if (is.null(default)) {
+                strdef <- as.character(NA)
+            } else {
+                strdef <- xmlValue(pvCh[["default"]])
+                if (length(strdef) == 0) strdef <- ""
+            }
+            pv <- c(pv, strdef)
             kd <- pvCh[["keydesc"]]
             if (is.null(kd)) {
                 nkd <- as.integer(NA)
@@ -83,7 +91,7 @@ parseGRASS <- function(cmd) {
                 strkd <- paste(sapply(kda, c), collapse=",")
             }
             pv <- c(pv, nkd, strkd)
-            names(pv) <- c(names(xmlAttrs(obj)), "desc",
+            names(pv) <- c(names(xmlAttrs(obj)), "desc", "default",
                 "keydesc_count", "keydesc")
             ps[[i]] <- pv
         }
@@ -135,6 +143,8 @@ print.GRASS_interface_desc <- function(x, ...) {
         cat("  name: ", i["name"], ", type: ",
             i["type"], ", required: ", i["required"], ", multiple: ",
             i["multiple"], "\n", sep="")
+        if (!is.na(i["default"])) cat("  default: ", i["default"],
+            "\n", sep="")
         if (!is.na(i["keydesc"])) cat("  keydesc: ", i["keydesc"],
             ", keydesc_count: ", i["keydesc_count"], "\n", sep="")
         cat("[", i["desc"], "]\n", sep="")
@@ -145,9 +155,20 @@ print.GRASS_interface_desc <- function(x, ...) {
     invisible(x)
 }
 
-doGRASS <- function(cmd, flags=NULL, parameters=NULL) {
+doGRASS <- function(cmd, flags=NULL, ..., parameters=NULL, echoCmd=NULL) {
     if (!is.null(flags)) stopifnot(is.character(flags))
     if (!is.null(parameters)) stopifnot(is.list(parameters))
+    if (is.null(echoCmd))
+        echoCmd <- get("echoCmd", env = .GRASS_CACHE)
+    stopifnot(is.logical(echoCmd))
+
+#    G6 <- get("GV", envir=.GRASS_CACHE) < "GRASS 7"
+
+    dlist <- list(...)
+    if (!is.null(parameters) && (length(dlist) > 0))
+        stop(paste("Use either GRASS parameters as R arguments,",
+        "or as a parameter argument list object, but not both", sep="\n"))
+    if (is.null(parameters) && (length(dlist) > 0)) parameters <- dlist
     pcmd <- parseGRASS(cmd)
     cmd <- paste(pcmd$prep, cmd, pcmd$ext, sep="")
     res <- cmd
@@ -175,9 +196,11 @@ doGRASS <- function(cmd, flags=NULL, parameters=NULL) {
       mults <- pt[, "multiple"] != "no" | (!is.na(pt[, "keydesc_count"]) &
         pt[, "keydesc_count"] > 1)
       mult <- pt[mults, "name"]
+      parameters <- insert_required(pcmd=pcmd, parameters=parameters,
+          pt=pt, req=req, suppress_required=suppress_required)
       if (!suppress_required && length(req) > 0 && is.null(parameters)) {
         print(pcmd)
-        stop("No parameters given where some are required")
+        stop("No parameters given where some are required with defaults declared")
       }
       if (!is.null(parameters)) {
         parnms <- names(parameters)
@@ -233,13 +256,61 @@ doGRASS <- function(cmd, flags=NULL, parameters=NULL) {
         }
       }
     }
+    if ((!is.null(pt) && is.null(parameters)) && is.null(flags))
+        if (get.stop_on_no_flags_parasOption())
+            stop("No flags or parameters provided")
+        else warning("No flags or parameters provided")
+    if (echoCmd) cat("GRASS command:", res, "\n")
     res
 }
 
-execGRASS <- function(cmd, flags=NULL, parameters=NULL, intern=FALSE,
-    ignore.stderr=FALSE, ...) {
-    syscmd <- doGRASS(cmd, flags=flags, parameters=parameters)
-    res <- system(syscmd, intern=intern, ignore.stderr=ignore.stderr, ...)
+insert_required <- function(pcmd, parameters, pt, req, suppress_required) {
+    defs <- pt[match(req, pt[, "name"]), "default"]
+    nadefs <- which(is.na(defs))
+    nms <- pt[match(req, pt[, "name"]), "name"]
+    nadefnms <- nms[nadefs]
+    pnms <- names(parameters)
+    nadefnms1 <- nadefnms[is.na(match(nadefnms, pnms))]
+    if (!suppress_required && length(nadefnms1) > 0) {
+        print(pcmd)
+        stop(paste("required parameters with no defaults missing:",
+        paste(nadefnms1, collapse=" ")))
+    }
+    types <- pt[match(req, pt[, "name"]), "type"]
+    defnms <- nms[!is.na(defs)]
+    deftypes <- types[!is.na(defs)]
+    defdefs <- defs[!is.na(defs)]
+    if (is.null(parameters)) parameters <- list()
+    for (i in seq(along=defnms)) {
+        if (!(defnms[i] %in% pnms)) {
+            parameters[[defnms[i]]] <- switch(deftypes[i],
+                integer = as.integer(defdefs[i]),
+                float = as.numeric(defdefs[i]),
+                string = defdefs[i])
+        }
+    }
+    if (length(parameters) == 0) parameters <- NULL
+    parameters
+}
+
+execGRASS <- function(cmd, flags=NULL, ..., parameters=NULL, intern=FALSE,
+    ignore.stderr=NULL, Sys_ignore.stdout=FALSE, Sys_wait=TRUE,
+    Sys_input=NULL, Sys_show.output.on.console=TRUE, Sys_minimized=FALSE,
+    Sys_invisible=TRUE, echoCmd=NULL) {
+    if (is.null(ignore.stderr))
+        ignore.stderr <- get("ignore.stderr", env = .GRASS_CACHE)
+    stopifnot(is.logical(ignore.stderr))
+    syscmd <- doGRASS(cmd, flags=flags, ..., parameters=parameters,
+        echoCmd=echoCmd)
+    if (get("SYS", envir=.GRASS_CACHE) == "unix") {
+        res <- system(syscmd, intern=intern, ignore.stderr=ignore.stderr,
+            ignore.stdout=Sys_ignore.stdout, wait=Sys_wait, input=Sys_input)
+    } else {
+        res <- system(syscmd, intern=intern, ignore.stderr=ignore.stderr,
+            ignore.stdout=Sys_ignore.stdout, wait=Sys_wait, input=Sys_input,
+            show.output.on.console=Sys_show.output.on.console, 
+            minimized=Sys_minimized, invisible=Sys_invisible)
+    }
     if (intern) return(res)
     invisible(res)
 }
