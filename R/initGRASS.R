@@ -69,6 +69,23 @@ initGRASS <- function(gisBase, home, SG, gisDbase, location, mapset,
                 Sys.setenv(PATH=paste(Sys.getenv("WINGISBASE"), "\\bin;",
                     Sys.getenv("WINGISBASE"), "\\lib;",
                     GRASS_addons, ";", Sys.getenv("PATH"), sep=""))
+            ePyPATH <- Sys.getenv("PYTHONPATH")
+            if ((length(grep(basename(Sys.getenv("WINGISBASE")), ePyPATH)) < 1) 
+                || nchar(ePyPATH) == 0) {
+                GrPyPATH <- paste(Sys.getenv("WINGISBASE"), "/etc/python",
+                    sep="")
+                if (nchar(ePyPATH) > 0)
+                    Sys.setenv(PYTHONPATH=paste(GrPyPATH, ePyPATH, sep=";"))
+                else Sys.setenv(PYTHONPATH=GrPyPATH)
+            }
+            Sys.setenv("PYTHONHOME"=paste(Sys.getenv("WINGISBASE"),
+                "Python27", sep="/"))
+            Sys.setenv("GRASS_PYTHON"=paste(Sys.getenv("WINGISBASE"),
+                "extrabin/python.exe", sep="/"))
+            pyScripts <- basename(list.files(paste(Sys.getenv("WINGISBASE"),
+                "scripts", sep="/"), pattern="py$"))
+            names(pyScripts) <- sub("\\.py", "", pyScripts)
+            assign("pyScripts", pyScripts, envir=.GRASS_CACHE)
         }
         Sys.setenv(WINGISRC=paste(Sys.getenv("HOME"), "\\.grassrc6", sep=""))
         if (file.exists(Sys.getenv("WINGISRC")) && !override)
@@ -108,6 +125,14 @@ initGRASS <- function(gisBase, home, SG, gisDbase, location, mapset,
         Sys.setenv(GISRC=paste(home, "/.grassrc6", sep=""))
         if (file.exists(Sys.getenv("GISRC")) && !override)
             stop("A GISRC file already exists; to override, set override=TRUE")
+        ePyPATH <- Sys.getenv("PYTHONPATH")
+        if (length(grep(basename(Sys.getenv("GISBASE")), ePyPATH)) < 1 
+            || nchar(ePyPATH) == 0) {
+            GrPyPATH <- paste(Sys.getenv("GISBASE"), "etc", "python", sep="/")
+            if (nchar(ePyPATH) > 0)
+                 Sys.setenv(PYTHONPATH=paste(GrPyPATH, ePyPATH, sep=":"))
+            else Sys.setenv(PYTHONPATH=GrPyPATH)
+        }
         if (!missing(gisDbase)) {
             if (!file.exists(gisDbase)) dir.create(gisDbase)
         } else {
