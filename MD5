@@ -1,5 +1,5 @@
 05cf47a4a40b556d4762b56317476e8c *ChangeLog
-a8ebd84ea98c864ff3685534231a7536 *DESCRIPTION
+c60f7f3d2fb713ae825c9f7ebde1deed *DESCRIPTION
 75d921c5d676f54220ffacb971b9fa22 *NAMESPACE
 f2529378850b38b5a7de59607bff49ca *R/AAA.R
 c9db5d7f71b616bee887ee6ea082b062 *R/bin_link.R
@@ -7,12 +7,12 @@ c9db5d7f71b616bee887ee6ea082b062 *R/bin_link.R
 c3e1dee5a17bc9d78eabde1544a19ad0 *R/options.R
 d2086f2ac68c3a5288dfc757bb28f348 *R/spgrass6.R
 8a2a59daf84cf6fab9a9cd9563abd77e *R/vect_link.R
-86d81891c4195eac921ed8f88f5d48e0 *R/xml1.R
+888f17b60f666354f54ba3ccec735725 *R/xml1.R
 2bdb63abacd66973e84151771c35071e *inst/CITATION
 05cf47a4a40b556d4762b56317476e8c *inst/ChangeLog
 af6b4ff5baf0b0ad62478644a7aacee9 *inst/doc/OSGeo_vol1_GRASS-R.pdf
-1f66e8d601d51329adccbcfd0b59eb7e *inst/doc/spgrass6_0.3.pdf
-5f65474432f5365fa14c8cb0d36a05a7 *man/execGRASS.Rd
+83c24fad8bc636911ebac23bd53aaeee *inst/doc/spgrass6_0.3.pdf
+7ca3c88bdea409260c9ae48d017c3b87 *man/execGRASS.Rd
 5b21ae99139352ff42022f45f122a470 *man/gmeta6.Rd
 da011972bdcb52aeec23dcb91331cadd *man/initGRASS.Rd
 0b2e42e50a9987c2c329adde2bb0f2ea *man/readRAST6.Rd
