@@ -1,5 +1,5 @@
 # Interpreted GRASS 6+ interface functions
-# Copyright (c) 2005-2012 Roger S. Bivand
+# Copyright (c) 2005-2013 Roger S. Bivand
 #
 
 readRAST6 <- function(vname, cat=NULL, ignore.stderr = NULL, 
@@ -8,7 +8,10 @@ readRAST6 <- function(vname, cat=NULL, ignore.stderr = NULL,
 	if (!is.null(cat))
 		if(length(vname) != length(cat)) 
 			stop("vname and cat not same length")
-    
+    if (get.suppressEchoCmdInFuncOption()) {
+        inEchoCmd <- get.echoCmdOption()
+        tull <- set.echoCmdOption(FALSE)
+    }
     if (is.null(plugin))
         plugin <- get.pluginOption()
     stopifnot(is.logical(plugin)|| is.null(plugin))
@@ -24,6 +27,9 @@ readRAST6 <- function(vname, cat=NULL, ignore.stderr = NULL,
         gdalD <- gdalDrivers()$name
     }
     if (!useGDAL && is.null(plugin)) plugin <- FALSE
+    if (close_OK) {
+         openedConns <- as.integer(row.names(showConnections()))
+    }
 
     if (is.null(plugin)) plugin <- "GRASS" %in% gdalD
     if (length(vname) > 1) plugin <- FALSE
@@ -111,7 +117,7 @@ readRAST6 <- function(vname, cat=NULL, ignore.stderr = NULL,
                     reslist[[i]] <- as.vector(getRasterData(DS, band=1))
 
                     deleteDataset(DS)
-                    GDAL.close(DS)
+# 130422 at rgdal 0.8-8 GDAL.close(DS)
 		} else {
 # 061107 Dylan Beaudette NODATA
 # 071009 Markus Neteler's idea to use range
@@ -192,11 +198,18 @@ readRAST6 <- function(vname, cat=NULL, ignore.stderr = NULL,
 	grid <- GridTopology(co, unname(c(gdal_info[6], gdal_info[7])),
             unname(c(gdal_info[2], gdal_info[1])))
 
-	if (close_OK) closeAllConnections()
+	if (close_OK) { #closeAllConnections()
+            openConns_now <- as.integer(row.names(showConnections()))
+            toBeClosed <- openConns_now[!(openConns_now %in% openedConns)]
+            for (bye in toBeClosed) close(bye)
+        }
 
         if (!return_SGDF) {
            res <- list(grid=grid, dataList=reslist, proj4string=p4)
            class(res) <- "gridList"
+           if (get.suppressEchoCmdInFuncOption()) {
+              tull <- set.echoCmdOption(inEchoCmd)
+           }
            return(res)
         }
 
@@ -231,6 +244,10 @@ readRAST6 <- function(vname, cat=NULL, ignore.stderr = NULL,
 		}
 	} 
     }
+    if (get.suppressEchoCmdInFuncOption()) {
+        tull <- set.echoCmdOption(inEchoCmd)
+    }
+
     resa
 }
 
@@ -390,6 +407,10 @@ writeRAST6 <- function(x, vname, zcol = 1, NODATA=NULL,
 	ignore.stderr = NULL, useGDAL=NULL, overwrite=FALSE, flags=NULL,
         drivername="GTiff") {
 
+        if (get.suppressEchoCmdInFuncOption()) {
+            inEchoCmd <- get.echoCmdOption()
+            tull <- set.echoCmdOption(FALSE)
+        }
 
         if (is.null(ignore.stderr))
             ignore.stderr <- get.ignore.stderrOption()
@@ -466,6 +487,9 @@ writeRAST6 <- function(x, vname, zcol = 1, NODATA=NULL,
 	    unlink(paste(rtmpfl1, list.files(rtmpfl1, pattern=fid), 
 		sep=.Platform$file.sep))
 	}
+        if (get.suppressEchoCmdInFuncOption()) {
+            tull <- set.echoCmdOption(inEchoCmd)
+        }
 
 	invisible(res)
 }
