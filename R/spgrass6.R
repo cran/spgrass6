@@ -2,7 +2,7 @@
 # Copyright (c) 2005-8 Roger S. Bivand
 #
 
-gmeta6 <- function(ignore.stderr = FALSE) {
+gmeta <- gmeta6 <- function(ignore.stderr = FALSE) {
         if (get.suppressEchoCmdInFuncOption()) {
             inEchoCmd <- get.echoCmdOption()
              tull <- set.echoCmdOption(FALSE)
@@ -57,14 +57,14 @@ gmeta6 <- function(ignore.stderr = FALSE) {
 	glist <- as.list(sapply(gisenv, function(x) x[2]))
 	names(glist) <- sapply(gisenv, function(x) x[1])
 	lres <- c(glist, lres)
-	class(lres) <- "gmeta6"
+	class(lres) <- c("gmeta", "gmeta6")
         if (get.suppressEchoCmdInFuncOption()) {
             tull <- set.echoCmdOption(inEchoCmd)
         }
 	lres
 }
 
-print.gmeta6 <- function(x, ...) {
+print.gmeta <- function(x, ...) {
     cat("gisdbase   ", x$GISDBASE, "\n")
     cat("location   ", x$LOCATION_NAME, "\n")
     cat("mapset     ", x$MAPSET, "\n")
@@ -81,7 +81,7 @@ print.gmeta6 <- function(x, ...) {
 }
 
 gmeta2grd <- function(ignore.stderr = FALSE) {
-	G <- gmeta6(ignore.stderr=ignore.stderr)
+	G <- gmeta(ignore.stderr=ignore.stderr)
 	cellcentre.offset <- c(G$w+(G$ewres/2), G$s+(G$nsres/2))
 	cellsize <- c(G$ewres, G$nsres)
 	cells.dim <- c(G$cols, G$rows)
@@ -156,3 +156,26 @@ getLocationProj <- function(ignore.stderr = FALSE) {
 }
 
 
+.grassVersion <- function(ignore.stderr=TRUE) {
+    Gver <- execGRASS(
+        "g.version",
+        intern = TRUE, 
+        ignore.stderr = ignore.stderr)
+    return(Gver)
+}
+
+.compatibleGRASSVersion <- function(gv=.grassVersion()) {
+    compatible <- ( (gv >= "GRASS 6.0") & (gv < "GRASS 7.0") )
+    if ( !compatible ){
+        attr(compatible, "message") <- paste0(
+            "\n### spgrass6 is not compatible with the GRASS GIS version '", gv, "'!",
+            "\n### Please use the package appropriate to the GRASS GIS version:",
+            "\n### GRASS GIS Version 5.x.y  --  GRASS",
+            "\n### GRASS GIS Version 6.x.y  --  spgrass6",
+            "\n### GRASS GIS Version 7.x.y  --  spgrass7"
+        )
+    } else {
+        attr(compatible, "message") <- paste0("spgrass7 is compatible with the GRASS GIS version '", gv, "' R is running in!")
+    }
+    return(compatible)
+}

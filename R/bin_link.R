@@ -2,7 +2,7 @@
 # Copyright (c) 2005-2013 Roger S. Bivand
 #
 
-readRAST6 <- function(vname, cat=NULL, ignore.stderr = NULL, 
+readRAST <- readRAST6 <- function(vname, cat=NULL, ignore.stderr = NULL, 
 	NODATA=NULL, plugin=NULL, mapset=NULL, useGDAL=NULL, close_OK=TRUE,
         drivername="GTiff", driverFileExt=NULL, return_SGDF=TRUE) {
 	if (!is.null(cat))
@@ -47,23 +47,16 @@ readRAST6 <- function(vname, cat=NULL, ignore.stderr = NULL,
 
 # 090311 fix for -c flag
         Cflag <- "c" %in% parseGRASS("r.out.gdal")$fnames
-        g7 <- Gver >= "GRASS 7"
 
         reslist <- vector(mode="list", length=length(vname))
         names(reslist) <- vname
 
 	for (i in seq(along=vname)) {
 
+                 whCELL <- execGRASS("r.info", flags="t",
+                 map=vname[i], intern=TRUE, 
+	         ignore.stderr=ignore.stderr)
 
-		if (g7) {
-                    glist <- execGRASS("r.info", flags="g", map=vname[i],
-                    intern=TRUE, ignore.stderr=ignore.stderr)
-                    whCELL <- glist[grep("datatype", glist)]
-                } else {
-                    whCELL <- execGRASS("r.info", flags="t",
-		    map=vname[i], intern=TRUE, 
-		    ignore.stderr=ignore.stderr)
-                }
 		to_int <- length(which(unlist(strsplit(
 			whCELL, "=")) == "CELL")) > 0
                 Dcell <- length(which(unlist(strsplit(
@@ -90,7 +83,8 @@ readRAST6 <- function(vname, cat=NULL, ignore.stderr = NULL,
 			warning("NODATA rounded to integer")
 		    NODATA <- round(NODATA)
 		}
-		if (useGDAL && G63) {
+
+                 if (useGDAL && G63) {
                   if (requireNamespace("rgdal", quietly = TRUE)) {
 
                     gdalDGRASS <- execGRASS("r.out.gdal", flags="l",
@@ -151,36 +145,41 @@ readRAST6 <- function(vname, cat=NULL, ignore.stderr = NULL,
 		      }
                     }
                     rOutBinFlags <- "b"
+                    tryCatch(
+                        {
 # 120118 Rainer Krug
-                    if (Gver < "GRASS 6.4.2") {
-                        if (to_int) rOutBinFlags <- c(rOutBinFlags, "i")
-		        execGRASS("r.out.bin", flags=rOutBinFlags, 
-			    input=vname[i], output=gtmpfl11,
-			    null=as.integer(NODATA),
-                            ignore.stderr=ignore.stderr)
-                    } else {
-                        if (to_int) rOutBinFlags <- c(rOutBinFlags, "i")
-                        else rOutBinFlags <- c(rOutBinFlags, "f")
-                        rOutBinBytes <- 4L
-                        if (Dcell) rOutBinBytes <- 8L
-		        execGRASS("r.out.bin", flags=rOutBinFlags, 
-			    input=vname[i], output=gtmpfl11, bytes=rOutBinBytes,
-			    null=as.integer(NODATA),
-                            ignore.stderr=ignore.stderr)
-                    }
-
-                    gdal_info <- bin_gdal_info(rtmpfl11, to_int)
-
-  	            what <- ifelse(to_int, "integer", "double")
-	            n <- gdal_info[1] * gdal_info[2]
-	            size <- gdal_info[10]/8
-
-		    reslist[[i]] <- readBinGridData(rtmpfl11, what=what,
-                        n=n, size=size, endian=attr(gdal_info, "endian"),
-                        nodata=attr(gdal_info, "nodata"))
-
-		    unlink(paste(rtmpfl1, list.files(rtmpfl1,
-                        pattern=vname[i]), sep=.Platform$file.sep))
+                            if (Gver < "GRASS 6.4.2") {
+                                if (to_int) rOutBinFlags <- c(rOutBinFlags, "i")
+                                execGRASS("r.out.bin", flags=rOutBinFlags, 
+                                          input=vname[i], output=gtmpfl11,
+                                          null=as.integer(NODATA),
+                                          ignore.stderr=ignore.stderr)
+                            } else {
+                                if (to_int) rOutBinFlags <- c(rOutBinFlags, "i")
+                                else rOutBinFlags <- c(rOutBinFlags, "f")
+                                rOutBinBytes <- 4L
+                                if (Dcell) rOutBinBytes <- 8L
+                                execGRASS("r.out.bin", flags=rOutBinFlags, 
+                                          input=vname[i], output=gtmpfl11, bytes=rOutBinBytes,
+                                          null=as.integer(NODATA),
+                                          ignore.stderr=ignore.stderr)
+                            }
+                            
+                            gdal_info <- bin_gdal_info(rtmpfl11, to_int)
+                            
+                            what <- ifelse(to_int, "integer", "double")
+                            n <- gdal_info[1] * gdal_info[2]
+                            size <- gdal_info[10]/8
+                            
+                            reslist[[i]] <- readBinGridData(rtmpfl11, what=what,
+                                                            n=n, size=size, endian=attr(gdal_info, "endian"),
+                                                            nodata=attr(gdal_info, "nodata"))
+                        },
+                        finally = {
+                            unlink(paste(rtmpfl1, list.files(rtmpfl1,
+                                                             pattern=vname[i]), sep=.Platform$file.sep))
+                        }
+                    )
 		}
 
 
@@ -376,7 +375,7 @@ read_plugin <- function(vname, mapset=NULL, ignore.stderr=NULL) {
         stopifnot(is.logical(ignore.stderr))
         if (length(vname) > 1) stop("single raster required for plugin")
 
-        gg <- gmeta6()
+        gg <- gmeta()
         if (is.null(mapset)) {
             c_at <- strsplit(vname[1], "@")[[1]]
             if (length(c_at) == 1) {
@@ -418,7 +417,7 @@ read_plugin <- function(vname, mapset=NULL, ignore.stderr=NULL) {
 }
     
 
-writeRAST6 <- function(x, vname, zcol = 1, NODATA=NULL, 
+writeRAST <- writeRAST6 <- function(x, vname, zcol = 1, NODATA=NULL, 
 	ignore.stderr = NULL, useGDAL=NULL, overwrite=FALSE, flags=NULL,
         drivername="GTiff") {
 
@@ -493,17 +492,21 @@ writeRAST6 <- function(x, vname, zcol = 1, NODATA=NULL,
 	    res <- writeBinGrid(x, rtmpfl11, attr = zcol, na.value = NODATA)
 
 	    flags <- c(res$flag, flags)
-	    
-	    execGRASS("r.in.bin", flags=flags,
-                input=gtmpfl11,
-		output=vname, bytes=as.integer(res$bytes), 
-		north=as.numeric(res$north), south=as.numeric(res$south), 
-		east=as.numeric(res$east), west=as.numeric(res$west), 
-		rows=as.integer(res$rows), cols=as.integer(res$cols), 
-		anull=as.numeric(res$anull), ignore.stderr=ignore.stderr)
-
-	    unlink(paste(rtmpfl1, list.files(rtmpfl1, pattern=fid), 
-		sep=.Platform$file.sep))
+	    tryCatch(
+                {
+                    execGRASS("r.in.bin", flags=flags,
+                              input=gtmpfl11,
+                              output=vname, bytes=as.integer(res$bytes), 
+                              north=as.numeric(res$north), south=as.numeric(res$south), 
+                              east=as.numeric(res$east), west=as.numeric(res$west), 
+                              rows=as.integer(res$rows), cols=as.integer(res$cols), 
+                              anull=as.numeric(res$anull), ignore.stderr=ignore.stderr)
+                },
+                finally = {
+                    unlink(paste(rtmpfl1, list.files(rtmpfl1, pattern=fid), 
+                                 sep=.Platform$file.sep))
+                }
+            )
 	}
         if (get.suppressEchoCmdInFuncOption()) {
             tull <- set.echoCmdOption(inEchoCmd)

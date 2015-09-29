@@ -1,7 +1,8 @@
 # Interpreted GRASS 6+ interface functions
 # Copyright (c) 2005-2012 Roger S. Bivand
 #
-readVECT6 <- function(vname, layer, type=NULL, plugin=NULL,
+
+readVECT <- readVECT6 <- function(vname, layer, type=NULL, plugin=NULL,
         remove.duplicates=TRUE, 
 	ignore.stderr = NULL, with_prj=TRUE, with_c=FALSE, mapset=NULL, 
 	pointDropZ=FALSE, driver="ESRI Shapefile") {
@@ -16,16 +17,13 @@ readVECT6 <- function(vname, layer, type=NULL, plugin=NULL,
     if (is.null(ignore.stderr))
         ignore.stderr <- get("ignore.stderr", envir = .GRASS_CACHE)
     stopifnot(is.logical(ignore.stderr))
-    G7 <- execGRASS("g.version", intern=TRUE) > "GRASS 7"
     if (missing(layer)) layer <- 1L
-    if (G7) layer <- as.character(layer)
 # 120908 emails Markus Neteler, Markus Metz, default TRUE before G7
     stopifnot(is.logical(with_c))
-    if (!G7) {
-      with_c <- !with_c
-      if (!ignore.stderr) 
-        message("with_c: argument reversed from version 0.7-11 and in GRASS 6")
-    }
+    with_c <- !with_c
+    if (!ignore.stderr) 
+      message("with_c: argument reversed from version 0.7-11 and in GRASS 6")
+
     if (driver == "GRASS") plugin <- TRUE
 
     if (requireNamespace("rgdal", quietly = TRUE)) {
@@ -37,7 +35,7 @@ readVECT6 <- function(vname, layer, type=NULL, plugin=NULL,
     if (plugin) {
         ogrD <- rgdal::ogrDrivers()$name
 	if (!("GRASS" %in% ogrD)) stop("no GRASS plugin driver")
-        gg <- gmeta6()
+        gg <- gmeta()
         if (is.null(mapset)) {
             c_at <- strsplit(vname[1], "@")[[1]]
             if (length(c_at) == 1) {
@@ -105,20 +103,25 @@ readVECT6 <- function(vname, layer, type=NULL, plugin=NULL,
             RDSN <- paste(rtmpfl1, shname, sep=.Platform$file.sep)
             LAYER <- shname
         }
-        execGRASS("v.out.ogr", flags=flags, input=vname,
-            type=type, layer=layer, dsn=GDSN, olayer=LAYER,
-            format=gsub(" ", "_", driver), ignore.stderr=ignore.stderr)
-
-        if (sss[1] >= "0.6" && as.integer(sss[2]) > 7) {
-	    res <- rgdal::readOGR(dsn=RDSN, layer=LAYER, verbose=!ignore.stderr, 
-	        pointDropZ=pointDropZ)
-        } else {
-	    res <- rgdal::readOGR(dsn=rtmpfl1, layer=shname, verbose=!ignore.stderr)           }
-
-	if (.Platform$OS.type != "windows") {
-            unlink(paste(rtmpfl1, list.files(rtmpfl1, pattern=shname), 
-	        sep=.Platform$file.sep))
-        }
+        tryCatch(
+            {
+                execGRASS("v.out.ogr", flags=flags, input=vname,
+                          type=type, layer=layer, dsn=GDSN, olayer=LAYER,
+                          format=gsub(" ", "_", driver), ignore.stderr=ignore.stderr)
+                
+                if (sss[1] >= "0.6" && as.integer(sss[2]) > 7) {
+                    res <- rgdal::readOGR(dsn=RDSN, layer=LAYER, verbose=!ignore.stderr, 
+                                          pointDropZ=pointDropZ)
+                } else {
+                    res <- rgdal::readOGR(dsn=rtmpfl1, layer=shname, verbose=!ignore.stderr)           }
+            },
+            finally = {
+                if (.Platform$OS.type != "windows") {
+                    unlink(paste(rtmpfl1, list.files(rtmpfl1, pattern=shname), 
+                                 sep=.Platform$file.sep))
+                }
+            }
+        )
         
 	if (remove.duplicates && type != "point") {
 		dups <- duplicated(slot(res, "data"))
@@ -238,7 +241,7 @@ readVECT6 <- function(vname, layer, type=NULL, plugin=NULL,
     return(retval)
 }
 
-writeVECT6 <- function(SDF, vname, #factor2char = TRUE, 
+writeVECT <- writeVECT6 <- function(SDF, vname, #factor2char = TRUE, 
 	v.in.ogr_flags=NULL, ignore.stderr = NULL, driver="ESRI Shapefile") {
 
         if (get.suppressEchoCmdInFuncOption()) {
@@ -291,19 +294,23 @@ writeVECT6 <- function(SDF, vname, #factor2char = TRUE,
             RDSN <- paste(rtmpfl1, shname, sep=.Platform$file.sep)
             LAYER <- shname
         }
-
-	rgdal::writeOGR(SDF, dsn=RDSN, layer=LAYER, driver=driver,
-            overwrite_layer=TRUE)
-
-
-	execGRASS("v.in.ogr", flags=v.in.ogr_flags,
-	    dsn=GDSN, output=vname, layer=LAYER,
-	    ignore.stderr=ignore.stderr)
-
-	if (.Platform$OS.type != "windows") {
-            unlink(paste(rtmpfl1, list.files(rtmpfl1, pattern=shname), 
-	        sep=.Platform$file.sep))
-        }
+        tryCatch(
+            {
+                rgdal::writeOGR(SDF, dsn=RDSN, layer=LAYER, driver=driver,
+                                overwrite_layer=TRUE)
+                
+                
+                execGRASS("v.in.ogr", flags=v.in.ogr_flags,
+                          dsn=GDSN, output=vname, layer=LAYER,
+                          ignore.stderr=ignore.stderr)
+            },
+            finally = {
+                if (.Platform$OS.type != "windows") {
+                    unlink(paste(rtmpfl1, list.files(rtmpfl1, pattern=shname), 
+                                 sep=.Platform$file.sep))
+                }
+            }
+        )
         if (get.suppressEchoCmdInFuncOption()) {
             tull <- set.echoCmdOption(inEchoCmd)
         }
@@ -322,9 +329,7 @@ vInfo <- function(vname, layer, ignore.stderr = NULL) {
             ignore.stderr <- get("ignore.stderr", envir = .GRASS_CACHE)
         stopifnot(is.logical(ignore.stderr))
 
-        G7 <- execGRASS("g.version", intern=TRUE) > "GRASS 7"
         if (missing(layer)) layer <- 1L
-        if (G7) layer <- as.character(layer)
 	vinfo0 <- execGRASS("v.info", flags="t", map=vname,
             layer=layer, intern=TRUE, ignore.stderr=ignore.stderr)
 
@@ -349,9 +354,7 @@ vColumns <- function(vname, layer, ignore.stderr = NULL) {
         if (is.null(ignore.stderr))
             ignore.stderr <- get("ignore.stderr", envir = .GRASS_CACHE)
         stopifnot(is.logical(ignore.stderr))
-        G7 <- execGRASS("g.version", intern=TRUE) > "GRASS 7"
         if (missing(layer)) layer <- 1L
-        if (G7) layer <- as.character(layer)
 	vinfo0 <- execGRASS("v.info", flags="c", map=vname,
             layer=layer, intern=TRUE, ignore.stderr=ignore.stderr)       
 	con <- textConnection(vinfo0)
@@ -373,9 +376,7 @@ vDataCount <- function(vname, layer, ignore.stderr = NULL) {
             ignore.stderr <- get("ignore.stderr", envir = .GRASS_CACHE)
         stopifnot(is.logical(ignore.stderr))
         column <- "column" %in% parseGRASS("v.db.select")$pnames
-        G7 <- execGRASS("g.version", intern=TRUE) > "GRASS 7"
         if (missing(layer)) layer <- 1L
-        if (G7) layer <- as.character(layer)
         parms <- list(map=vname, layer=layer, columns="cat")
         if (column) tull <- execGRASS("v.db.select", flags="c",
             parameters=parms, intern=TRUE, ignore.stderr=ignore.stderr)
